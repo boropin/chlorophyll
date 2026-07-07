@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2E7D32">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>稲葉クロロフィル診断 - 現場検査アプリ</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+
+        header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .screen {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* ========================================== */
+        /* ホーム画面 */
+        /* ========================================== */
+        .home-screen {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .welcome-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 100%;
+        }
+
+        .welcome-card h2 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #2E7D32;
+        }
+
+        .welcome-card p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .feature-list {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .feature-list li {
+            margin: 8px 0;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #2E7D32;
+            font-weight: bold;
+        }
+
+        /* ========================================== */
+        /* カメラ画面 */
+        /* ========================================== */
+        .camera-screen {
+            padding: 0;
+        }
+
+        .camera-container {
+            flex: 1;
+            position: relative;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #previewCanvas {
+            display: none;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .overlay-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            aspect-ratio: 4/3;
+            border: 3px dashed rgba(255,255,255,0.5);
+            border-radius: 12px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .mode-indicator {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .mode-indicator.reflector {
+            background: rgba(255, 152, 0, 0.8);
+        }
+
+        .mode-indicator.leaf {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: 16px;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 12px;
+            padding: 0 16px;
+            justify-content: center;
+        }
+
+        .btn-circle {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .btn-capture {
+            background: #4CAF50;
+            color: white;
+            width: 72px;
+            height: 72px;
+        }
+
+        .btn-capture:active {
+            transform: scale(0.95);
+            background: #45a049;
+        }
+
+        .btn-flip {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            width: 56px;
+            height: 56px;
+        }
+
+        /* ========================================== */
+        /* 結果画面 */
+        /* ========================================== */
+        .result-screen {
+            padding: 16px;
+        }
+
+        .result-image-section {
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .result-image {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            margin-bottom: 12px;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border-left: 4px solid #2E7D32;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .result-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .result-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2E7D32;
+            margin-bottom: 4px;
+        }
+
+        .result-unit {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .diagnosis-card {
+            background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .diagnosis-level {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .diagnosis-description {
+            font-size: 14px;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+
+        .recommendation {
+            background: rgba(255,255,255,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .rgb-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .rgb-box {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        /* ========================================== */
+        /* ポイント指定画面 */
+        /* ========================================== */
+        .points-screen {
+            padding: 16px;
+        }
+
+        .points-instruction {
+            background: #E3F2FD;
+            border-left: 4px solid #2196F3;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #1565C0;
+        }
+
+        .points-canvas-container {
+            position: relative;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+            background: #f9f9f9;
+        }
+
+        #pointsCanvas {
+            width: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .points-list {
+            margin-bottom: 16px;
+        }
+
+        .point-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .point-label {
+            color: #666;
+        }
+
+        .point-delete {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        /* ========================================== */
+        /* ボタン */
+        /* ========================================== */
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            padding: 16px;
+            background: #f5f5f5;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2E7D32;
+            color: white;
+        }
+
+        .btn-primary:active {
+            background: #1B5E20;
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:active {
+            background: #d0d0d0;
+            transform: scale(0.98);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #2E7D32;
+            border: 2px solid #2E7D32;
+        }
+
+        /* ========================================== */
+        /* データリスト画面 */
+        /* ========================================== */
+        .data-screen {
+            padding: 16px;
+        }
+
+        .data-item {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #2E7D32;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .data-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 4px;
+        }
+
+        .data-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .data-exg {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2E7D32;
+        }
+
+        .data-diagnosis {
+            font-size: 12px;
+            background: #E8F5E9;
+            color: #2E7D32;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        /* ========================================== */
+        /* ローディング */
+        /* ========================================== */
+        .spinner {
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top: 3px solid #2E7D32;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ========================================== */
+        /* レスポンシブ対応 */
+        /* ========================================== */
+        @media (max-width: 480px) {
+            header h1 {
+                font-size: 16px;
+            }
+
+            .welcome-card {
+                padding: 16px;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌾 稲葉クロロフィル診断</h1>
+            <p>現場検査アプリ</p>
+        </header>
+
+        <div class="main-content">
+            <!-- ホーム画面 -->
+            <div class="screen active home-screen" id="homeScreen">
+                <div class="welcome-card">
+                    <h2>現場検査スタート</h2>
+                    <p>スマートフォンのカメラで、稲葉の窒素濃度をリアルタイム診断します。</p>
+                    
+                    <div class="feature-list">
+                        <ul>
+                            <li>反射板で環境を掌握</li>
+                            <li>葉をアップで撮影</li>
+                            <li>即座に診断結果</li>
+                            <li>複数葉の連続測定</li>
+                        </ul>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="startReflectorCapture()" style="width: 100%; padding: 14px; margin-top: 20px;">
+                        反射板を撮影
+                    </button>
+                </div>
+            </div>
+
+            <!-- カメラ画面 -->
+            <div class="screen camera-screen" id="cameraScreen">
+                <div class="camera-container">
+                    <video id="video" playsinline autoplay></video>
+                    <canvas id="previewCanvas"></canvas>
+                    
+                    <div class="camera-overlay">
+                        <div class="overlay-guide"></div>
+                        <div class="mode-indicator" id="modeIndicator">反射板</div>
+                    </div>
+
+                    <div class="camera-controls">
+                        <button class="btn-circle btn-flip" onclick="flipCamera()" title="カメラ切り替え">
+                            🔄
+                        </button>
+                        <button class="btn-circle btn-capture" onclick="capturePhoto()" title="撮影">
+                            📷
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ポイント指定画面 -->
+            <div class="screen points-screen" id="pointsScreen">
+                <h2 style="margin-bottom: 16px;">葉のポイントを指定</h2>
+                <div class="points-instruction">
+                    画像上をクリックして、葉の色が濃い部分を3～5か所指定してください。
+                </div>
+
+                <div class="points-canvas-container">
+                    <canvas id="pointsCanvas"></canvas>
+                </div>
+
+                <div class="points-list" id="pointsList"></div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="clearAllPoints()">全削除</button>
+                    <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeLeaf()" disabled>
+                        解析開始（3個以上）
+                    </button>
+                </div>
+            </div>
+
+            <!-- 結果画面 -->
+            <div class="screen result-screen" id="resultScreen">
+                <div class="result-image-section">
+                    <img id="resultImage" class="result-image" />
+                </div>
+
+                <div class="diagnosis-card">
+                    <div class="diagnosis-level" id="diagnosisLevel">適正</div>
+                    <div class="diagnosis-description" id="diagnosisText">窒素濃度は標準範囲です</div>
+                    <div class="recommendation" id="recommendationText">
+                        標準管理で問題ありません
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>ExG値（グリーン指数）</h3>
+                    <div class="result-value" id="exgValue">---</div>
+                    <div class="result-unit">値が高いほど窒素が豊富</div>
+                </div>
+
+                <div class="result-card">
+                    <h3>推定窒素濃度</h3>
+                    <div class="result-value" id="nitrogenValue">---</div>
+                    <div class="result-unit">%（パーセント）</div>
+                </div>
+
+                <div class="result-card">
+                    <h3>RGB値（補正後）</h3>
+                    <div class="rgb-display" id="rgbDisplay"></div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="downloadData()">データ保存</button>
+                    <button class="btn btn-primary" onclick="captureNextLeaf()">次の葉を撮影</button>
+                </div>
+            </div>
+
+            <!-- データリスト画面 -->
+            <div class="screen data-screen" id="dataScreen">
+                <h2 style="margin-bottom: 16px;">測定データ</h2>
+                <div id="dataList" class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <p>まだデータがありません</p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="clearAllData()">全削除</button>
+                    <button class="btn btn-primary" onclick="goHome()">ホームに戻る</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // グローバル状態管理
+        // ========================================
+        const state = {
+            mode: 'reflector', // 'reflector' or 'leaf'
+            reflectorImage: null,
+            reflectorRGB: null,
+            leafImage: null,
+            leafPoints: [],
+            measurements: [],
+            currentFacingMode: 'environment'
+        };
+
+        // ========================================
+        // スクリーン制御
+        // ========================================
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function goHome() {
+            showScreen('homeScreen');
+        }
+
+        // ========================================
+        // 反射板撮影フロー
+        // ========================================
+        function startReflectorCapture() {
+            state.mode = 'reflector';
+            state.leafPoints = [];
+            showScreen('cameraScreen');
+            document.getElementById('modeIndicator').className = 'mode-indicator reflector';
+            document.getElementById('modeIndicator').textContent = '反射板を撮影';
+            startCamera();
+        }
+
+        // ========================================
+        // カメラ制御
+        // ========================================
+        let stream = null;
+
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: state.currentFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.play();
+            } catch (err) {
+                console.error('カメラエラー:', err);
+                alert('カメラへのアクセスが許可されていません');
+            }
+        }
+
+        function flipCamera() {
+            state.currentFacingMode = state.currentFacingMode === 'environment' ? 'user' : 'environment';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            startCamera();
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            ctx.drawImage(video, 0, 0);
+
+            if (state.mode === 'reflector') {
+                captureReflector(canvas);
+            } else if (state.mode === 'leaf') {
+                captureLeaf(canvas);
+            }
+        }
+
+        // ========================================
+        // 反射板キャプチャ処理
+        // ========================================
+        function captureReflector(canvas) {
+            state.reflectorImage = canvas.toDataURL('image/jpeg');
+
+            // 反射板領域を自動検出してRGB値を取得
+            detectReflector(canvas);
+        }
+
+        function detectReflector(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // 明るい領域（反射板）を検出
+            let brightCount = 0;
+            let totalR = 0, totalG = 0, totalB = 0;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                // グレースケール値が高い（V値が大きい）ものをカウント
+                const grey = 0.299 * r + 0.587 * g + 0.114 * b;
+                if (grey > 180 && Math.abs(r - g) < 50 && Math.abs(g - b) < 50) {
+                    totalR += r;
+                    totalG += g;
+                    totalB += b;
+                    brightCount++;
+                }
+            }
+
+            if (brightCount > 0) {
+                state.reflectorRGB = {
+                    r: totalR / brightCount,
+                    g: totalG / brightCount,
+                    b: totalB / brightCount
+                };
+
+                console.log('反射板検出:', state.reflectorRGB);
+                alert(`✅ 反射板を検出しました\nRGB: (${Math.round(state.reflectorRGB.r)}, ${Math.round(state.reflectorRGB.g)}, ${Math.round(state.reflectorRGB.b)})`);
+
+                // 葉撮影モードに切り替え
+                setTimeout(() => {
+                    state.mode = 'leaf';
+                    document.getElementById('modeIndicator').className = 'mode-indicator leaf';
+                    document.getElementById('modeIndicator').textContent = '葉を撮影';
+                }, 500);
+            } else {
+                alert('❌ 反射板が検出できません。反射板を正面に向けて撮影してください。');
+            }
+        }
+
+        // ========================================
+        // 葉撮影処理
+        // ========================================
+        function captureLeaf(canvas) {
+            state.leafImage = canvas.toDataURL('image/jpeg');
+
+            // ポイント指定画面へ
+            showPointsScreen();
+        }
+
+        function showPointsScreen() {
+            showScreen('pointsScreen');
+            
+            // キャンバスに葉の画像を表示
+            const pointsCanvas = document.getElementById('pointsCanvas');
+            const img = new Image();
+            img.onload = function() {
+                pointsCanvas.width = img.width;
+                pointsCanvas.height = img.height;
+                const ctx = pointsCanvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // コンテナの幅に合わせてスケール
+                const container = pointsCanvas.parentElement;
+                const scale = container.clientWidth / img.width;
+                pointsCanvas.style.width = '100%';
+                pointsCanvas.style.height = 'auto';
+
+                // クリックイベント
+                pointsCanvas.addEventListener('click', (e) => addPoint(e, pointsCanvas, img.width, img.height, scale));
+            };
+            img.src = state.leafImage;
+        }
+
+        // ========================================
+        // ポイント指定
+        // ========================================
+        function addPoint(e, canvas, imageWidth, imageHeight, scale) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+
+            if (state.leafPoints.length < 5) {
+                state.leafPoints.push({ x, y });
+                updatePointsList();
+                redrawPoints(canvas, imageWidth, imageHeight);
+
+                if (state.leafPoints.length >= 3) {
+                    document.getElementById('analyzeBtn').disabled = false;
+                }
+            }
+        }
+
+        function updatePointsList() {
+            const list = document.getElementById('pointsList');
+            list.innerHTML = state.leafPoints.map((p, i) => `
+                <div class="point-item">
+                    <span class="point-label">ポイント ${i + 1}: (${Math.round(p.x)}, ${Math.round(p.y)})</span>
+                    <button class="point-delete" onclick="deletePoint(${i})">削除</button>
+                </div>
+            `).join('');
+        }
+
+        function deletePoint(index) {
+            state.leafPoints.splice(index, 1);
+            updatePointsList();
+
+            if (state.leafPoints.length < 3) {
+                document.getElementById('analyzeBtn').disabled = true;
+            }
+
+            const pointsCanvas = document.getElementById('pointsCanvas');
+            redrawPoints(pointsCanvas, pointsCanvas.width, pointsCanvas.height);
+        }
+
+        function clearAllPoints() {
+            state.leafPoints = [];
+            updatePointsList();
+            document.getElementById('analyzeBtn').disabled = true;
+
+            const pointsCanvas = document.getElementById('pointsCanvas');
+            const ctx = pointsCanvas.getContext('2d');
+            const img = new Image();
+            img.src = state.leafImage;
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+            };
+        }
+
+        function redrawPoints(canvas, imageWidth, imageHeight) {
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+
+                // ポイントを描画
+                state.leafPoints.forEach((p, i) => {
+                    const scale = canvas.width / imageWidth;
+                    const screenX = p.x * scale;
+                    const screenY = p.y * scale;
+
+                    // ポイント円
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // ポイント番号
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(i + 1, screenX, screenY);
+                });
+            };
+            img.src = state.leafImage;
+        }
+
+        // ========================================
+        // 分析処理
+        // ========================================
+        function analyzeLeaf() {
+            if (state.leafPoints.length < 3 || !state.reflectorRGB) {
+                alert('エラー: 反射板またはポイントが不足しています');
+                return;
+            }
+
+            // キャンバスから画像データを取得
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                // 各ポイントでRGB値を抽出
+                const leafRGBValues = [];
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+
+                state.leafPoints.forEach(p => {
+                    const windowSize = Math.max(Math.floor(canvas.width / 50), 5);
+                    const x_min = Math.max(0, p.x - windowSize);
+                    const x_max = Math.min(canvas.width, p.x + windowSize);
+                    const y_min = Math.max(0, p.y - windowSize);
+                    const y_max = Math.min(canvas.height, p.y + windowSize);
+
+                    let totalR = 0, totalG = 0, totalB = 0, count = 0;
+
+                    for (let y = y_min; y < y_max; y++) {
+                        for (let x = x_min; x < x_max; x++) {
+                            const idx = (y * canvas.width + x) * 4;
+                            totalR += data[idx];
+                            totalG += data[idx + 1];
+                            totalB += data[idx + 2];
+                            count++;
+                        }
+                    }
+
+                    leafRGBValues.push({
+                        r: totalR / count,
+                        g: totalG / count,
+                        b: totalB / count
+                    });
+                });
+
+                // 露出補正
+                const greyReflector = 0.299 * state.reflectorRGB.r + 0.587 * state.reflectorRGB.g + 0.114 * state.reflectorRGB.b;
+                const correctionFactor = 150 / greyReflector;
+
+                const leafRGBCorrected = leafRGBValues.map(rgb => ({
+                    r: rgb.r * correctionFactor,
+                    g: rgb.g * correctionFactor,
+                    b: rgb.b * correctionFactor
+                }));
+
+                // 平均値を計算
+                const avgR = leafRGBCorrected.reduce((sum, rgb) => sum + rgb.r, 0) / leafRGBCorrected.length;
+                const avgG = leafRGBCorrected.reduce((sum, rgb) => sum + rgb.g, 0) / leafRGBCorrected.length;
+                const avgB = leafRGBCorrected.reduce((sum, rgb) => sum + rgb.b, 0) / leafRGBCorrected.length;
+
+                // クロロフィル指数を計算
+                const exg = 2 * avgG - avgR - avgB;
+                const ngrdi = (avgG - avgR) / (avgG + avgR + 1e-6);
+                const nitrogen = 0.15 * ngrdi + 1.2;
+
+                // 診断
+                let diagnosis, recommendation;
+                if (exg < 100) {
+                    diagnosis = '窒素不足';
+                    recommendation = '穂肥の施用を検討してください';
+                } else if (exg < 250) {
+                    diagnosis = 'やや不足';
+                    recommendation = '1週間後に再測定を推奨';
+                } else if (exg < 400) {
+                    diagnosis = '適正';
+                    recommendation = '標準管理で問題ありません';
+                } else {
+                    diagnosis = '過剰';
+                    recommendation = '追肥を控えてください';
+                }
+
+                // 結果を保存
+                const result = {
+                    timestamp: new Date().toLocaleString('ja-JP'),
+                    exg: exg.toFixed(1),
+                    nitrogen: nitrogen.toFixed(2),
+                    diagnosis: diagnosis,
+                    recommendation: recommendation,
+                    rgbCorrected: { r: avgR.toFixed(1), g: avgG.toFixed(1), b: avgB.toFixed(1) },
+                    image: state.leafImage
+                };
+
+                state.measurements.push(result);
+
+                // 結果画面を表示
+                showResults(result);
+            };
+            img.src = state.leafImage;
+        }
+
+        // ========================================
+        // 結果表示
+        // ========================================
+        function showResults(result) {
+            document.getElementById('resultImage').src = result.image;
+            document.getElementById('exgValue').textContent = result.exg;
+            document.getElementById('nitrogenValue').textContent = result.nitrogen + '%';
+            document.getElementById('diagnosisLevel').textContent = result.diagnosis;
+            document.getElementById('diagnosisText').textContent = `推定窒素: ${result.nitrogen}%`;
+            document.getElementById('recommendationText').textContent = result.recommendation;
+
+            const rgb = result.rgbCorrected;
+            document.getElementById('rgbDisplay').innerHTML = `
+                <div class="rgb-box"><strong>R</strong><br>${rgb.r}</div>
+                <div class="rgb-box"><strong>G</strong><br>${rgb.g}</div>
+                <div class="rgb-box"><strong>B</strong><br>${rgb.b}</div>
+            `;
+
+            showScreen('resultScreen');
+        }
+
+        function captureNextLeaf() {
+            state.leafPoints = [];
+            state.leafImage = null;
+            state.mode = 'leaf';
+            showScreen('cameraScreen');
+            document.getElementById('modeIndicator').className = 'mode-indicator leaf';
+            document.getElementById('modeIndicator').textContent = '葉を撮影';
+        }
+
+        // ========================================
+        // データ管理
+        // ========================================
+        function downloadData() {
+            const csv = [
+                ['測定時刻', 'ExG値', '推定窒素濃度(%)', '診断', '推奨アクション'],
+                ...state.measurements.map(m => [
+                    m.timestamp,
+                    m.exg,
+                    m.nitrogen,
+                    m.diagnosis,
+                    m.recommendation
+                ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `chlorophyll_data_${new Date().getTime()}.csv`;
+            link.click();
+
+            // データ画面を表示
+            showDataScreen();
+        }
+
+        function showDataScreen() {
+            const dataList = document.getElementById('dataList');
+            if (state.measurements.length === 0) {
+                dataList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>まだデータがありません</p></div>';
+            } else {
+                dataList.innerHTML = state.measurements.map(m => `
+                    <div class="data-item">
+                        <div class="data-time">${m.timestamp}</div>
+                        <div class="data-main">
+                            <div>
+                                <div class="data-exg">ExG: ${m.exg}</div>
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">窒素: ${m.nitrogen}%</div>
+                            </div>
+                            <div class="data-diagnosis">${m.diagnosis}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            showScreen('dataScreen');
+        }
+
+        function clearAllData() {
+            if (confirm('すべてのデータを削除しますか？')) {
+                state.measurements = [];
+                document.getElementById('dataList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>まだデータがありません</p></div>';
+            }
+        }
+
+        // ========================================
+        // Service Worker登録（PWA対応）
+        // ========================================
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW登録エラー:', err));
+        }
+    </script>
+</body>
+</html>
