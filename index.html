@@ -1263,15 +1263,19 @@
             draggingIndex = -1;
         }
 
-        // 色取得専用のオフスクリーンキャンバス（常に等倍の元画像を保持）
+        // 色取得専用のオフスクリーンキャンバス（常に「今表示中の写真」を保持）
+        // サイズが同じでも中身は必ず最新の写真に描き直す（前の葉の色が残るのを防ぐ）
         let colorSourceCanvas = null;
+        let colorSourceImageRef = null; // 最後に描き込んだ画像の参照
         function ensureColorSource() {
             if (!pointsImage) return;
             if (!colorSourceCanvas) colorSourceCanvas = document.createElement('canvas');
-            if (colorSourceCanvas.width !== pointsImage.width || colorSourceCanvas.height !== pointsImage.height) {
+            // 画像の「参照」が前回と違えば、サイズが同じでも必ず描き直す
+            if (colorSourceImageRef !== pointsImage) {
                 colorSourceCanvas.width = pointsImage.width;
                 colorSourceCanvas.height = pointsImage.height;
                 colorSourceCanvas.getContext('2d').drawImage(pointsImage, 0, 0);
+                colorSourceImageRef = pointsImage;
             }
         }
 
@@ -1352,9 +1356,11 @@
                 0, 0, canvas.width, canvas.height         // 描画先（全体）
             );
 
-            // マーカーサイズ（表示解像度基準、拡大時も一定の見た目サイズ）
-            const markerRadius = Math.max(canvas.width / 22, 22);
-            const fontSize = Math.max(canvas.width / 40, 16);
+            // マーカーサイズ：ズームするほど大きく見えるようにする
+            // （キャンバス解像度自体は変わらないため、zoomを掛けて画面上での拡大率に合わせる）
+            const baseRadius = Math.max(canvas.width / 22, 22);
+            const markerRadius = Math.min(baseRadius * zoom, baseRadius * 2.5); // 大きくなりすぎないよう上限を設ける
+            const fontSize = Math.min(Math.max(canvas.width / 40, 16) * zoom, Math.max(canvas.width / 40, 16) * 2.5);
 
             state.leafPoints.forEach((p, i) => {
                 const col = getColorAt(p.x, p.y);
@@ -1731,13 +1737,25 @@
         // Service Worker登録（PWA対応）
         // ========================================
         if ('serviceWorker' in navigator) {
-            // 現在のページのディレクトリを基準に登録（サブディレクトリ配信でも動作）
-            const swPath = new URL('sw.js', window.location.href).href;
-            const swScope = new URL('./', window.location.href).href;
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register(swPath, { scope: swScope })
-                    .then(reg => console.log('SW登録成功:', reg.scope))
-                    .catch(err => console.log('SW登録エラー:', err));
+                try {
+                    // 現在のページのディレクトリを基準に登録（サブディレクトリ配信でも動作）
+                    const swPath = new URL('sw.js', window.location.href).href;
+                    const swScope = new URL('./', window.location.href).href;
+                    navigator.serviceWorker.register(swPath, { scope: swScope })
+                        .then(reg => console.log('SW登録成功:', reg.scope))
+                        .catch(err => console.log('SW登録エラー:', err));
+                } catch (e) {
+                    // プレビュー環境などwindow.location.hrefがURLの基準にできない場合は、
+                    // 単純な相対パスでの登録にフォールバックする（失敗しても無視）
+                    try {
+                        navigator.serviceWorker.register('./sw.js')
+                            .then(reg => console.log('SW登録成功(fallback):', reg.scope))
+                            .catch(err => console.log('SW登録エラー(fallback):', err));
+                    } catch (e2) {
+                        console.log('SW登録をスキップ（この環境では利用不可）:', e2);
+                    }
+                }
             });
         }
     </script>
