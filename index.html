@@ -24,9 +24,11 @@
         .container {
             max-width: 100%;
             height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
             background-color: #fff;
+            overflow: hidden;
         }
 
         header {
@@ -35,6 +37,7 @@
             padding: 16px;
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-shrink: 0;
         }
 
         header h1 {
@@ -52,6 +55,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-height: 0;
         }
 
         .screen {
@@ -73,6 +77,7 @@
             align-items: center;
             padding: 20px;
             text-align: center;
+            overflow-y: auto;
         }
 
         .welcome-card {
@@ -122,6 +127,7 @@
         /* ========================================== */
         .camera-screen {
             padding: 0;
+            overflow: hidden;
         }
 
         .camera-container {
@@ -132,9 +138,10 @@
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            min-height: 0;
         }
 
-        video, canvas {
+        #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -351,6 +358,7 @@
 
         #pointsCanvas {
             width: 100%;
+            height: auto;
             display: block;
             cursor: crosshair;
         }
@@ -554,7 +562,7 @@
             <!-- カメラ画面 -->
             <div class="screen camera-screen" id="cameraScreen">
                 <div class="camera-container">
-                    <video id="video" playsinline autoplay></video>
+                    <video id="video" playsinline autoplay muted></video>
                     <canvas id="previewCanvas"></canvas>
                     
                     <div class="camera-overlay">
@@ -691,30 +699,46 @@
 
         async function startCamera() {
             try {
+                // 既存のストリームがあれば必ず停止（重複起動・静止画化を防ぐ）
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+
                 const constraints = {
                     video: {
-                        facingMode: state.currentFacingMode,
+                        facingMode: { ideal: state.currentFacingMode },
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
-                    }
+                    },
+                    audio: false
                 };
 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const video = document.getElementById('video');
                 video.srcObject = stream;
-                video.play();
+                // iOS Safari で自動再生させるために必須
+                video.muted = true;
+                video.setAttribute('playsinline', '');
+                // メタデータ読み込み後に再生（黒画面・静止画化を防ぐ）
+                await video.play().catch(e => console.log('play待機:', e));
             } catch (err) {
                 console.error('カメラエラー:', err);
-                alert('カメラへのアクセスが許可されていません');
+                alert('カメラへのアクセスが許可されていません。\n設定でカメラを許可してください。');
             }
         }
 
         function flipCamera() {
             state.currentFacingMode = state.currentFacingMode === 'environment' ? 'user' : 'environment';
+            startCamera();
+        }
+
+        // カメラを停止（画面遷移時に呼ぶ）
+        function stopCamera() {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
+                stream = null;
             }
-            startCamera();
         }
 
         function capturePhoto() {
@@ -776,14 +800,13 @@
                 };
 
                 console.log('反射板検出:', state.reflectorRGB);
-                alert(`✅ 反射板を検出しました\nRGB: (${Math.round(state.reflectorRGB.r)}, ${Math.round(state.reflectorRGB.g)}, ${Math.round(state.reflectorRGB.b)})`);
+                alert(`✅ 反射板を検出しました\nRGB: (${Math.round(state.reflectorRGB.r)}, ${Math.round(state.reflectorRGB.g)}, ${Math.round(state.reflectorRGB.b)})\n\n続いて葉を撮影してください。`);
 
-                // 葉撮影モードに切り替え
-                setTimeout(() => {
-                    state.mode = 'leaf';
-                    document.getElementById('modeIndicator').className = 'mode-indicator leaf';
-                    document.getElementById('modeIndicator').textContent = '葉を撮影';
-                }, 500);
+                // 葉撮影モードに切り替え、カメラを再起動して映像を動かす
+                state.mode = 'leaf';
+                document.getElementById('modeIndicator').className = 'mode-indicator leaf';
+                document.getElementById('modeIndicator').textContent = '葉を撮影';
+                startCamera();
             } else {
                 alert('❌ 反射板が検出できません。反射板を正面に向けて撮影してください。');
             }
@@ -795,51 +818,71 @@
         function captureLeaf(canvas) {
             state.leafImage = canvas.toDataURL('image/jpeg');
 
+            // 撮影が終わったのでカメラを停止（電池節約・映像固定）
+            stopCamera();
+
+            // 前の葉のポイントを完全にリセット
+            state.leafPoints = [];
+            state.leafRGBValues = [];
+            pointsImage = null;
+            document.getElementById('analyzeBtn').disabled = true;
+            updatePointsList();
+
             // ポイント指定画面へ
             showPointsScreen();
         }
 
+        // ポイント指定で使う画像を一度だけ保持する
+        let pointsImage = null;
+        let pointsClickHandlerAttached = false;
+
         function showPointsScreen() {
             showScreen('pointsScreen');
-            
-            // キャンバスに葉の画像を表示
+
             const pointsCanvas = document.getElementById('pointsCanvas');
+
+            // 葉の画像を読み込み、キャンバスの実解像度を画像サイズに設定
             const img = new Image();
             img.onload = function() {
+                pointsImage = img;
                 pointsCanvas.width = img.width;
                 pointsCanvas.height = img.height;
-                const ctx = pointsCanvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // コンテナの幅に合わせてスケール
-                const container = pointsCanvas.parentElement;
-                const scale = container.clientWidth / img.width;
+                // 表示はCSSで幅100%・高さautoにより自動スケール（画像は切れない）
                 pointsCanvas.style.width = '100%';
                 pointsCanvas.style.height = 'auto';
 
-                // クリックイベント
-                pointsCanvas.addEventListener('click', (e) => addPoint(e, pointsCanvas, img.width, img.height, scale));
+                // 画像を描画（ポイントはまだ無い）
+                redrawPoints();
+
+                // クリックリスナーは一度だけ登録（重複登録による多重増加を防止）
+                if (!pointsClickHandlerAttached) {
+                    pointsCanvas.addEventListener('click', onCanvasClick);
+                    pointsClickHandlerAttached = true;
+                }
             };
             img.src = state.leafImage;
         }
 
-        // ========================================
-        // ポイント指定
-        // ========================================
-        function addPoint(e, canvas, imageWidth, imageHeight, scale) {
+        // キャンバスクリック時のハンドラ（表示座標→画像座標へ変換）
+        function onCanvasClick(e) {
+            const canvas = document.getElementById('pointsCanvas');
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / scale;
-            const y = (e.clientY - rect.top) / scale;
+            // 表示上のクリック位置を、キャンバスの実解像度の座標に変換
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
-            if (state.leafPoints.length < 5) {
-                state.leafPoints.push({ x, y });
-                updatePointsList();
-                redrawPoints(canvas, imageWidth, imageHeight);
-
-                if (state.leafPoints.length >= 3) {
-                    document.getElementById('analyzeBtn').disabled = false;
-                }
+            if (state.leafPoints.length >= 5) {
+                alert('ポイントは最大5個までです');
+                return;
             }
+
+            state.leafPoints.push({ x, y });
+            updatePointsList();
+            redrawPoints();
+
+            document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
         }
 
         function updatePointsList() {
@@ -855,56 +898,49 @@
         function deletePoint(index) {
             state.leafPoints.splice(index, 1);
             updatePointsList();
-
-            if (state.leafPoints.length < 3) {
-                document.getElementById('analyzeBtn').disabled = true;
-            }
-
-            const pointsCanvas = document.getElementById('pointsCanvas');
-            redrawPoints(pointsCanvas, pointsCanvas.width, pointsCanvas.height);
+            redrawPoints();
+            document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
         }
 
         function clearAllPoints() {
             state.leafPoints = [];
             updatePointsList();
+            redrawPoints();
             document.getElementById('analyzeBtn').disabled = true;
-
-            const pointsCanvas = document.getElementById('pointsCanvas');
-            const ctx = pointsCanvas.getContext('2d');
-            const img = new Image();
-            img.src = state.leafImage;
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0);
-            };
         }
 
-        function redrawPoints(canvas, imageWidth, imageHeight) {
+        // キャンバスを再描画（画像＋現在のポイントすべて）— 同期処理で確実
+        function redrawPoints() {
+            const canvas = document.getElementById('pointsCanvas');
             const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0);
 
-                // ポイントを描画
-                state.leafPoints.forEach((p, i) => {
-                    const scale = canvas.width / imageWidth;
-                    const screenX = p.x * scale;
-                    const screenY = p.y * scale;
+            if (!pointsImage) return;
 
-                    // ポイント円
-                    ctx.fillStyle = '#4CAF50';
-                    ctx.beginPath();
-                    ctx.arc(screenX, screenY, 8, 0, 2 * Math.PI);
-                    ctx.fill();
+            // 毎回まっさらに描き直す（古いポイントの残留を完全に防止）
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(pointsImage, 0, 0, canvas.width, canvas.height);
 
-                    // ポイント番号
-                    ctx.fillStyle = 'white';
-                    ctx.font = 'bold 12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(i + 1, screenX, screenY);
-                });
-            };
-            img.src = state.leafImage;
+            // マーカーのサイズを画像解像度に合わせて調整（大きい写真でも見やすく）
+            const markerRadius = Math.max(canvas.width / 45, 10);
+            const fontSize = Math.max(canvas.width / 55, 12);
+
+            state.leafPoints.forEach((p, i) => {
+                // ポイント円
+                ctx.fillStyle = '#4CAF50';
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = Math.max(canvas.width / 300, 2);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, markerRadius, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+
+                // ポイント番号
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(i + 1, p.x, p.y);
+            });
         }
 
         // ========================================
@@ -931,11 +967,13 @@
                 const data = imageData.data;
 
                 state.leafPoints.forEach(p => {
+                    const px = Math.round(p.x);
+                    const py = Math.round(p.y);
                     const windowSize = Math.max(Math.floor(canvas.width / 50), 5);
-                    const x_min = Math.max(0, p.x - windowSize);
-                    const x_max = Math.min(canvas.width, p.x + windowSize);
-                    const y_min = Math.max(0, p.y - windowSize);
-                    const y_max = Math.min(canvas.height, p.y + windowSize);
+                    const x_min = Math.max(0, px - windowSize);
+                    const x_max = Math.min(canvas.width, px + windowSize);
+                    const y_min = Math.max(0, py - windowSize);
+                    const y_max = Math.min(canvas.height, py + windowSize);
 
                     let totalR = 0, totalG = 0, totalB = 0, count = 0;
 
@@ -1034,11 +1072,15 @@
 
         function captureNextLeaf() {
             state.leafPoints = [];
+            state.leafRGBValues = [];
             state.leafImage = null;
             state.mode = 'leaf';
+            document.getElementById('analyzeBtn').disabled = true;
             showScreen('cameraScreen');
             document.getElementById('modeIndicator').className = 'mode-indicator leaf';
             document.getElementById('modeIndicator').textContent = '葉を撮影';
+            // カメラを再起動して映像を動かす（黒画面防止）
+            startCamera();
         }
 
         // ========================================
