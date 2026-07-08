@@ -191,6 +191,88 @@
             margin-top: 2px;
         }
 
+        .reflector-status {
+            background: #E8F5E9;
+            border: 2px solid #2E7D32;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            text-align: left;
+        }
+
+        .reflector-status-text {
+            font-size: 12px;
+            color: #1B5E20;
+            line-height: 1.6;
+        }
+
+        /* ========================================== */
+        /* 選択モーダル（反射板データの保持/破棄など） */
+        /* ========================================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 340px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1B5E20;
+            margin-bottom: 10px;
+        }
+
+        .modal-message {
+            font-size: 13px;
+            color: #444;
+            line-height: 1.7;
+            margin-bottom: 18px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .modal-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-btn-primary {
+            background: #2E7D32;
+            color: white;
+        }
+
+        .modal-btn-secondary {
+            background: #f0f0f0;
+            color: #444;
+        }
+
         /* ========================================== */
         /* カメラ画面 */
         /* ========================================== */
@@ -780,7 +862,16 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-primary" onclick="startReflectorCapture()" style="width: 100%; padding: 14px; margin-top: 16px;">
+                    <div class="reflector-status" id="reflectorStatusBox" style="display:none;">
+                        <div class="reflector-status-text">
+                            ✅ 反射板データを保持中（明るさの基準: <span id="reflectorStatusRGB"></span>）
+                        </div>
+                        <button class="btn btn-primary" onclick="continueWithSavedReflector()" style="width: 100%; padding: 14px; margin-top: 8px;">
+                            この反射板データで葉を測定
+                        </button>
+                    </div>
+
+                    <button class="btn" id="reflectorStartBtn" onclick="startReflectorCapture()" style="width: 100%; padding: 14px; margin-top: 12px;">
                         反射板を撮影して開始
                     </button>
                 </div>
@@ -886,6 +977,9 @@
                     <button class="btn btn-secondary" onclick="downloadData()">データ保存</button>
                     <button class="btn btn-primary" onclick="captureNextLeaf()">次の葉を撮影</button>
                 </div>
+                <div class="btn-group" style="padding-top: 0; background: transparent;">
+                    <button class="btn btn-outline" style="width: 100%;" onclick="goHomeFromResult()">ホームに戻る</button>
+                </div>
             </div>
 
             <!-- データリスト画面 -->
@@ -899,6 +993,18 @@
                     <button class="btn btn-secondary" onclick="clearAllData()">全削除</button>
                     <button class="btn btn-primary" onclick="goHome()">ホームに戻る</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 選択モーダル（反射板データの保持/破棄など、汎用） -->
+    <div class="modal-overlay" id="appModal">
+        <div class="modal-box">
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-message" id="modalMessage"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-primary" id="modalBtnA"></button>
+                <button class="modal-btn modal-btn-secondary" id="modalBtnB"></button>
             </div>
         </div>
     </div>
@@ -937,6 +1043,97 @@
 
         function goHome() {
             showScreen('homeScreen');
+            updateHomeReflectorStatus();
+        }
+
+        // ========================================
+        // 汎用選択モーダル（2択の確認ダイアログ）
+        // ========================================
+        function showChoiceModal(title, message, labelA, labelB, onA, onB) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+
+            const btnA = document.getElementById('modalBtnA');
+            const btnB = document.getElementById('modalBtnB');
+            btnA.textContent = labelA;
+            btnB.textContent = labelB;
+
+            // 前回のリスナーが残らないよう、ボタンを複製して置き換える
+            const newBtnA = btnA.cloneNode(true);
+            const newBtnB = btnB.cloneNode(true);
+            btnA.parentNode.replaceChild(newBtnA, btnA);
+            btnB.parentNode.replaceChild(newBtnB, btnB);
+
+            newBtnA.addEventListener('click', () => {
+                closeModal();
+                if (onA) onA();
+            });
+            newBtnB.addEventListener('click', () => {
+                closeModal();
+                if (onB) onB();
+            });
+
+            document.getElementById('appModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('appModal').classList.remove('active');
+        }
+
+        // ========================================
+        // 反射板データの保持状況（ホーム画面表示）
+        // ========================================
+        function updateHomeReflectorStatus() {
+            const box = document.getElementById('reflectorStatusBox');
+            const startBtn = document.getElementById('reflectorStartBtn');
+            if (state.reflectorRGB) {
+                const rgb = state.reflectorRGB;
+                document.getElementById('reflectorStatusRGB').textContent =
+                    `R${Math.round(rgb.r)} G${Math.round(rgb.g)} B${Math.round(rgb.b)}`;
+                box.style.display = 'block';
+                // データがある場合、通常の撮影ボタンは「撮り直す」という位置づけに
+                startBtn.textContent = '反射板を撮り直す';
+                startBtn.className = 'btn btn-secondary';
+            } else {
+                box.style.display = 'none';
+                startBtn.textContent = '反射板を撮影して開始';
+                startBtn.className = 'btn btn-primary';
+            }
+        }
+
+        // 結果画面からホームへ戻る（反射板データの保持/破棄を選択）
+        function goHomeFromResult() {
+            if (state.reflectorRGB) {
+                showChoiceModal(
+                    '反射板データについて',
+                    '現在の反射板データ（明るさの基準）があります。ホームに戻ったあとも、このデータを保持しますか？',
+                    '保持する（次も同じ基準で測定）',
+                    '破棄する（次回は撮り直す）',
+                    () => { goHome(); },
+                    () => { state.reflectorRGB = null; state.reflectorImage = null; goHome(); }
+                );
+            } else {
+                goHome();
+            }
+        }
+
+        // 保持している反射板データのまま、葉の撮影に進む（反射板の再撮影をスキップ）
+        function continueWithSavedReflector() {
+            if (!state.reflectorRGB) {
+                alert('反射板データがありません。先に反射板を撮影してください。');
+                return;
+            }
+            state.mode = 'leaf';
+            state.leafPoints = [];
+            state.leafRGBValues = [];
+            state.leafImage = null;
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            if (analyzeBtn) analyzeBtn.disabled = true;
+            showScreen('cameraScreen');
+            document.getElementById('modeIndicator').className = 'mode-indicator leaf';
+            document.getElementById('modeIndicator').textContent = '葉を撮影';
+            document.getElementById('overlayGuide').classList.add('hidden');
+            startCamera();
         }
 
         // 生育段階を選択
@@ -1131,6 +1328,10 @@
         let lastTapTime = 0;       // ダブルタップ検出用
 
         function showPointsScreen() {
+            // 前の葉のスクロール位置が残らないよう画面全体を上端に戻す
+            const pointsScreenEl = document.getElementById('pointsScreen');
+            if (pointsScreenEl) pointsScreenEl.scrollTop = 0;
+
             showScreen('pointsScreen');
 
             const pointsCanvas = document.getElementById('pointsCanvas');
@@ -1659,7 +1860,21 @@
                 <div class="rgb-box"><strong>B</strong><br>${rgb.b}</div>
             `;
 
+            // 前回の表示(一番下までスクロールした状態など)が一瞬映り込まないよう
+            // 画面を切り替える前に即座に上端へ戻しておく（保険）
+            const resultScreenEl = document.getElementById('resultScreen');
+            if (resultScreenEl) resultScreenEl.scrollTop = 0;
+
             showScreen('resultScreen');
+
+            // 前回のスクロール位置が残らないよう、写真の直下（診断カード）が
+            // 画面の上端に来る位置へリセットする（毎回同じ見え方に揃える）
+            requestAnimationFrame(() => {
+                const diagCard = document.querySelector('#resultScreen .diagnosis-card');
+                if (diagCard) {
+                    diagCard.scrollIntoView({ behavior: 'auto', block: 'start' });
+                }
+            });
         }
 
         function captureNextLeaf() {
@@ -1732,6 +1947,11 @@
                 document.getElementById('dataList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>まだデータがありません</p></div>';
             }
         }
+
+        // ========================================
+        // 初期化
+        // ========================================
+        updateHomeReflectorStatus();
 
         // ========================================
         // Service Worker登録（PWA対応）
