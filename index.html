@@ -973,6 +973,11 @@
                     <div class="rgb-display" id="rgbDisplay"></div>
                 </div>
 
+                <div class="result-card" id="locationCard">
+                    <h3>位置情報</h3>
+                    <div class="result-unit" id="locationText">取得中...</div>
+                </div>
+
                 <div class="btn-group">
                     <button class="btn btn-secondary" onclick="downloadData()">データ保存</button>
                     <button class="btn btn-primary" onclick="captureNextLeaf()">次の葉を撮影</button>
@@ -1312,8 +1317,34 @@
             document.getElementById('analyzeBtn').disabled = true;
             updatePointsList();
 
+            // 位置情報の取得を開始（ユーザーがポイント指定している間にバックグラウンドで解決させる。
+            // 取得できなくても測定は続行するため、失敗時はnullで解決する）
+            currentLeafLocationPromise = requestGeolocation();
+
             // ポイント指定画面へ
             showPointsScreen();
+        }
+
+        // 現在地を取得する（取得できない/拒否された場合はnullを返す。測定を止めない）
+        let currentLeafLocationPromise = null;
+        function requestGeolocation() {
+            return new Promise((resolve) => {
+                if (!('geolocation' in navigator)) {
+                    resolve(null);
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        resolve({
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            accuracy: pos.coords.accuracy
+                        });
+                    },
+                    () => resolve(null), // 拒否・タイムアウト等はエラーにせず null
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+                );
+            });
         }
 
         // ポイント指定で使う画像を一度だけ保持する
@@ -1661,7 +1692,7 @@
             const canvas = document.getElementById('previewCanvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
-            img.onload = function() {
+            img.onload = async function() {
                 canvas.width = img.width;
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
@@ -1733,6 +1764,17 @@
                 // 生育段階に応じた評価（測定値は常に出す。評価だけ時期で変える）
                 const evalResult = evaluateByStage(state.growthStage, spad, colorScale);
 
+                // 位置情報（撮影時にバックグラウンドで取得開始したものを待ち受ける。
+                // 取得できていなくても測定は止めない＝nullのまま先へ進む）
+                let loc = null;
+                if (currentLeafLocationPromise) {
+                    try {
+                        loc = await currentLeafLocationPromise;
+                    } catch (e) {
+                        loc = null;
+                    }
+                }
+
                 // 結果を保存
                 const result = {
                     timestamp: new Date().toLocaleString('ja-JP'),
@@ -1747,6 +1789,10 @@
                     fertilizer: evalResult.fertilizer,
                     hasEval: evalResult.hasEval,
                     rgbCorrected: { r: avgR.toFixed(1), g: avgG.toFixed(1), b: avgB.toFixed(1) },
+                    latitude: loc ? loc.lat.toFixed(6) : '',
+                    longitude: loc ? loc.lng.toFixed(6) : '',
+                    locationAccuracy: loc ? Math.round(loc.accuracy) : '',
+                    mapLink: loc ? `https://www.google.com/maps?q=${loc.lat.toFixed(6)},${loc.lng.toFixed(6)}` : '',
                     image: state.leafImage
                 };
 
@@ -1860,6 +1906,14 @@
                 <div class="rgb-box"><strong>B</strong><br>${rgb.b}</div>
             `;
 
+            // 位置情報の表示（取得できていれば地図リンク、できていなければその旨を表示）
+            const locText = document.getElementById('locationText');
+            if (result.latitude && result.longitude) {
+                locText.innerHTML = `緯度${result.latitude} / 経度${result.longitude}（誤差約${result.locationAccuracy}m）　<a href="${result.mapLink}" target="_blank" rel="noopener">地図で見る</a>`;
+            } else {
+                locText.textContent = '取得できませんでした（位置情報の許可がオフか、電波状況によるものです）';
+            }
+
             // 前回の表示(一番下までスクロールした状態など)が一瞬映り込まないよう
             // 画面を切り替える前に即座に上端へ戻しておく（保険）
             const resultScreenEl = document.getElementById('resultScreen');
@@ -1894,9 +1948,24 @@
         // ========================================
         // データ管理
         // ========================================
+        // 日時をファイル名向けの形式(YYYYMMDD_HHMMSS)に整形する
+        function formatTimestampForFilename(date) {
+            const pad = (n) => String(n).padStart(2, '0');
+            const y = date.getFullYear();
+            const mo = pad(date.getMonth() + 1);
+            const d = pad(date.getDate());
+            const h = pad(date.getHours());
+            const mi = pad(date.getMinutes());
+            const s = pad(date.getSeconds());
+            return `${y}${mo}${d}_${h}${mi}${s}`;
+        }
+
         function downloadData() {
             const csv = [
-                ['測定時刻', '生育段階', '葉色板(推定)', 'SPAD(推定)', '診断', '穂肥/追肥の目安', 'ExG値', '推定窒素(%)', '推奨アクション'],
+                // Latitude/Longitude は Google マイマップ等のインポート機能が
+                // 自動認識しやすいよう英語表記を含めている
+                ['測定時刻', '生育段階', '葉色板(推定)', 'SPAD(推定)', '診断', '穂肥/追肥の目安', 'ExG値', '推定窒素(%)',
+                 '推奨アクション', '緯度(Latitude)', '経度(Longitude)', '位置精度(m)', '地図リンク'],
                 ...state.measurements.map(m => [
                     m.timestamp,
                     m.stageLabel || '',
@@ -1906,14 +1975,19 @@
                     m.fertilizer || '',
                     m.exg,
                     m.nitrogen,
-                    m.recommendation
+                    m.recommendation,
+                    m.latitude || '',
+                    m.longitude || '',
+                    m.locationAccuracy || '',
+                    m.mapLink || ''
                 ])
             ].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `chlorophyll_data_${new Date().getTime()}.csv`;
+            // ファイル名：rice_leaf_color_diagnosis_YYYYMMDD_HHMMSS.csv
+            link.download = `rice_leaf_color_diagnosis_${formatTimestampForFilename(new Date())}.csv`;
             link.click();
 
             // データ画面を表示
