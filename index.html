@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#2E7D32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>稲葉クロロフィル診断 - 現場検査アプリ</title>
+    <title>水稲 葉色診断（荒木農園版）</title>
     <link rel="manifest" href="manifest.json">
     <style>
         * {
@@ -120,6 +120,75 @@
             left: 0;
             color: #2E7D32;
             font-weight: bold;
+        }
+
+        .leaf-tip {
+            background: #E8F5E9;
+            border-left: 3px solid #2E7D32;
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #1B5E20;
+            line-height: 1.6;
+            text-align: left;
+            margin-top: 12px;
+        }
+
+        .stage-select {
+            margin-top: 16px;
+            text-align: left;
+        }
+
+        .stage-select-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .stage-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .stage-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: left;
+        }
+
+        .stage-btn.active {
+            border-color: #2E7D32;
+            background: #F1F8E9;
+        }
+
+        .stage-btn:active {
+            transform: scale(0.99);
+        }
+
+        .stage-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stage-btn.active .stage-name {
+            color: #1B5E20;
+        }
+
+        .stage-sub {
+            font-size: 11px;
+            color: #999;
+            margin-top: 2px;
         }
 
         /* ========================================== */
@@ -307,6 +376,26 @@
             color: #999;
         }
 
+        .highlight-card {
+            border-left-color: #F9A825;
+            background: #FFFDF5;
+        }
+
+        .highlight-card .result-value {
+            color: #EF6C00;
+        }
+
+        .calibration-note {
+            background: #FFF8E1;
+            border: 1px solid #FFE082;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 16px;
+            font-size: 12px;
+            color: #8D6E00;
+            line-height: 1.6;
+        }
+
         .diagnosis-card {
             background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
             color: white;
@@ -334,6 +423,26 @@
             border-radius: 6px;
             font-size: 13px;
             line-height: 1.6;
+        }
+
+        .fertilizer-box {
+            background: rgba(255,255,255,0.95);
+            color: #1B5E20;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            line-height: 1.6;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .fertilizer-box::before {
+            content: "🌾 穂肥の目安";
+            display: block;
+            font-size: 11px;
+            color: #66906a;
+            margin-bottom: 4px;
         }
 
         .rgb-display {
@@ -387,6 +496,38 @@
             justify-content: center;
             align-items: center;
             flex-shrink: 0;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 5;
+        }
+
+        .zoom-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(46, 125, 50, 0.9);
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            line-height: 1;
+        }
+
+        .zoom-btn:active {
+            background: rgba(27, 94, 32, 1);
+            transform: scale(0.94);
         }
 
         #pointsCanvas {
@@ -589,28 +730,58 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌾 稲葉クロロフィル診断</h1>
-            <p>現場検査アプリ</p>
+            <h1>🌾 水稲 葉色診断</h1>
+            <p>荒木農園版</p>
         </header>
 
         <div class="main-content">
             <!-- ホーム画面 -->
             <div class="screen active home-screen" id="homeScreen">
                 <div class="welcome-card">
-                    <h2>現場検査スタート</h2>
-                    <p>スマートフォンのカメラで、稲葉の窒素濃度をリアルタイム診断します。</p>
+                    <h2>葉色診断スタート</h2>
+                    <p>スマートフォンのカメラで、コシヒカリの葉色から穂肥の要否を診断します。</p>
                     
                     <div class="feature-list">
                         <ul>
-                            <li>反射板で環境を掌握</li>
+                            <li>反射板で明るさを補正</li>
                             <li>葉をアップで撮影</li>
-                            <li>即座に診断結果</li>
+                            <li>葉色板・SPAD・穂肥の目安を表示</li>
                             <li>複数葉の連続測定</li>
                         </ul>
                     </div>
 
-                    <button class="btn btn-primary" onclick="startReflectorCapture()" style="width: 100%; padding: 14px; margin-top: 20px;">
-                        反射板を撮影
+                    <div class="leaf-tip">
+                        測定する葉は、上から2番目の完全に開いた葉（第2展開葉）の中央部が基準です。
+                    </div>
+
+                    <div class="stage-select">
+                        <div class="stage-select-title">生育段階を選択</div>
+                        <div class="stage-options" id="stageOptions">
+                            <button class="stage-btn active" data-stage="measure" onclick="selectStage('measure')">
+                                <span class="stage-name">実測のみ</span>
+                                <span class="stage-sub">数値の記録・比較</span>
+                            </button>
+                            <button class="stage-btn" data-stage="tillering" onclick="selectStage('tillering')">
+                                <span class="stage-name">最大分げつ期</span>
+                                <span class="stage-sub">6月中旬ごろ</span>
+                            </button>
+                            <button class="stage-btn" data-stage="midsummer" onclick="selectStage('midsummer')">
+                                <span class="stage-name">中干し終了直前</span>
+                                <span class="stage-sub">6月末〜7月初頭・穂肥判断</span>
+                            </button>
+                            <button class="stage-btn" data-stage="heading" onclick="selectStage('heading')">
+                                <span class="stage-name">出穂期</span>
+                                <span class="stage-sub">7月中〜下旬</span>
+                            </button>
+                            <button class="stage-btn" data-stage="preharvest" onclick="selectStage('preharvest')">
+                                <span class="stage-name">収穫直前</span>
+                                <span class="stage-sub">8月下旬</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" onclick="startReflectorCapture()" style="width: 100%; padding: 14px; margin-top: 16px;">
+                        反射板を撮影して開始
                     </button>
                 </div>
             </div>
@@ -641,11 +812,16 @@
             <div class="screen points-screen" id="pointsScreen">
                 <h2 style="margin-bottom: 16px;">葉のポイントを指定</h2>
                 <div class="points-instruction">
-                    3つの測定点を自動配置しました。円の色がその場所の葉の色です。指でドラッグして、葉の濃い部分に合わせてください。
+                    3つの測定点を自動配置しました。円の色がその場所の葉の色です。指でドラッグして葉の濃い部分に合わせてください。＋−ボタンやダブルタップで拡大できます。
                 </div>
 
-                <div class="points-canvas-container">
+                <div class="points-canvas-container" id="pointsCanvasContainer">
                     <canvas id="pointsCanvas"></canvas>
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomOut()" aria-label="縮小">−</button>
+                        <button class="zoom-btn" onclick="zoomReset()" aria-label="リセット">⟲</button>
+                        <button class="zoom-btn" onclick="zoomIn()" aria-label="拡大">＋</button>
+                    </div>
                 </div>
 
                 <div class="points-list" id="pointsList"></div>
@@ -670,18 +846,35 @@
                     <div class="recommendation" id="recommendationText">
                         標準管理で問題ありません
                     </div>
+                    <div class="fertilizer-box" id="fertilizerBox"></div>
+                </div>
+
+                <div class="result-card highlight-card">
+                    <h3>葉色板の値（穂肥判断の主指標）</h3>
+                    <div class="result-value" id="colorScaleValue">---</div>
+                    <div class="result-unit">水稲用葉色板 1〜7 換算値／4.5が穂肥の境目</div>
+                </div>
+
+                <div class="result-card highlight-card">
+                    <h3>SPAD値（推定）</h3>
+                    <div class="result-value" id="spadValue">---</div>
+                    <div class="result-unit">葉緑素計 相当の推定値（適正32〜35）</div>
                 </div>
 
                 <div class="result-card">
                     <h3>ExG値（グリーン指数）</h3>
                     <div class="result-value" id="exgValue">---</div>
-                    <div class="result-unit">値が高いほど窒素が豊富</div>
+                    <div class="result-unit">画像解析の元指標（値が高いほど濃い）</div>
                 </div>
 
                 <div class="result-card">
                     <h3>推定窒素濃度</h3>
                     <div class="result-value" id="nitrogenValue">---</div>
-                    <div class="result-unit">%（パーセント）</div>
+                    <div class="result-unit">%（参考値）</div>
+                </div>
+
+                <div class="calibration-note">
+                    ※ 診断は津地域農業改良普及センターのコシヒカリ穂肥基準（葉色板4.5が施用の境目）に準拠した目安です。SPAD・葉色板・施用量は推定値であり、実際の施肥は草丈・茎数・天候・生育時期も含めた総合判断で決めてください。正式な数値は自圃場サンプルでの較正（方法③）後に確定します。
                 </div>
 
                 <div class="result-card">
@@ -716,12 +909,22 @@
         // ========================================
         const state = {
             mode: 'reflector', // 'reflector' or 'leaf'
+            growthStage: 'measure', // measure/tillering/midsummer/heading/preharvest
             reflectorImage: null,
             reflectorRGB: null,
             leafImage: null,
             leafPoints: [],
             measurements: [],
             currentFacingMode: 'environment'
+        };
+
+        // 生育段階の定義（表示名と、その時期の評価方針）
+        const GROWTH_STAGES = {
+            measure:    { label: '実測のみ',       sub: '数値の記録・比較',          period: '' },
+            tillering:  { label: '最大分げつ期',   sub: '6月中旬ごろ',              period: '中干し開始前' },
+            midsummer:  { label: '中干し終了直前', sub: '6月末〜7月初頭（穂肥判断）', period: '幼穂形成〜減数分裂期' },
+            heading:    { label: '出穂期',         sub: '7月中〜下旬',              period: '出穂前後' },
+            preharvest: { label: '収穫直前',       sub: '8月下旬',                  period: '登熟後期' }
         };
 
         // ========================================
@@ -734,6 +937,14 @@
 
         function goHome() {
             showScreen('homeScreen');
+        }
+
+        // 生育段階を選択
+        function selectStage(stage) {
+            state.growthStage = stage;
+            document.querySelectorAll('.stage-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.stage === stage);
+            });
         }
 
         // ========================================
@@ -913,6 +1124,12 @@
         let pointsHandlersAttached = false;
         let draggingIndex = -1;   // ドラッグ中のポイント番号（-1なら無し）
 
+        // ズーム表示の状態（画像のどの範囲を表示するか）
+        let zoom = 1;              // 拡大倍率
+        let viewOffsetX = 0;       // 表示左上の画像X座標
+        let viewOffsetY = 0;       // 表示左上の画像Y座標
+        let lastTapTime = 0;       // ダブルタップ検出用
+
         function showPointsScreen() {
             showScreen('pointsScreen');
 
@@ -924,6 +1141,11 @@
                 pointsImage = img;
                 pointsCanvas.width = img.width;
                 pointsCanvas.height = img.height;
+
+                // ズームを初期化
+                zoom = 1;
+                viewOffsetX = 0;
+                viewOffsetY = 0;
 
                 // 3点を自動配置（画像中央付近に三角形状に散らす）
                 autoPlacePoints();
@@ -961,22 +1183,28 @@
             ];
         }
 
-        // イベント座標→画像解像度の座標に変換
+        // イベント座標→画像解像度の座標に変換（ズーム考慮）
         function eventToImageCoords(e) {
             const canvas = document.getElementById('pointsCanvas');
             const rect = canvas.getBoundingClientRect();
-            const point = e.touches ? e.touches[0] : e;
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (point.clientX - rect.left) * scaleX;
-            const y = (point.clientY - rect.top) * scaleY;
+            const point = e.touches && e.touches[0] ? e.touches[0] : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : e);
+            // キャンバス表示上の相対位置（0〜1）
+            const relX = (point.clientX - rect.left) / rect.width;
+            const relY = (point.clientY - rect.top) / rect.height;
+            // 現在表示している画像範囲の幅・高さ
+            const viewW = canvas.width / zoom;
+            const viewH = canvas.height / zoom;
+            // 画像座標に変換
+            const x = viewOffsetX + relX * viewW;
+            const y = viewOffsetY + relY * viewH;
             return { x, y };
         }
 
         // 指定座標に最も近いポイントの番号を返す（近ければ）
         function findNearestPoint(x, y) {
             const canvas = document.getElementById('pointsCanvas');
-            const hitRadius = Math.max(canvas.width / 12, 40); // 指で掴みやすい範囲
+            // 掴み判定は表示上の距離で一定になるよう、ズーム倍率で割る
+            const hitRadius = Math.max(canvas.width / 12, 40) / zoom;
             let nearest = -1;
             let minDist = hitRadius;
             state.leafPoints.forEach((p, i) => {
@@ -991,11 +1219,28 @@
 
         function onPointerDown(e) {
             e.preventDefault();
+
+            // ダブルタップ検出（300ms以内の連続タップ）
+            const now = Date.now();
+            const isDoubleTap = (now - lastTapTime) < 300;
+            lastTapTime = now;
+
             const { x, y } = eventToImageCoords(e);
+
+            if (isDoubleTap) {
+                // ダブルタップした位置を中心にズーム切り替え
+                if (zoom < 2) {
+                    applyZoom(2.5, x, y);
+                } else {
+                    zoomReset();
+                }
+                draggingIndex = -1;
+                return;
+            }
+
             draggingIndex = findNearestPoint(x, y);
             // 近くに点が無ければ何もしない（誤操作で点が増えないように）
             if (draggingIndex >= 0) {
-                // つかんだ点をその位置に少し寄せる
                 state.leafPoints[draggingIndex] = { x, y };
                 redrawPoints();
                 updatePointsList();
@@ -1018,17 +1263,31 @@
             draggingIndex = -1;
         }
 
-        // 指定座標の色を取得（周辺の平均、露出補正なしの生の色）
+        // 色取得専用のオフスクリーンキャンバス（常に等倍の元画像を保持）
+        let colorSourceCanvas = null;
+        function ensureColorSource() {
+            if (!pointsImage) return;
+            if (!colorSourceCanvas) colorSourceCanvas = document.createElement('canvas');
+            if (colorSourceCanvas.width !== pointsImage.width || colorSourceCanvas.height !== pointsImage.height) {
+                colorSourceCanvas.width = pointsImage.width;
+                colorSourceCanvas.height = pointsImage.height;
+                colorSourceCanvas.getContext('2d').drawImage(pointsImage, 0, 0);
+            }
+        }
+
+        // 画像座標(x,y)の色を、等倍の元画像から正確に取得（ズームの影響を受けない）
         function getColorAt(x, y) {
-            const canvas = document.getElementById('pointsCanvas');
-            const ctx = canvas.getContext('2d');
-            const px = Math.round(Math.max(0, Math.min(canvas.width - 1, x)));
-            const py = Math.round(Math.max(0, Math.min(canvas.height - 1, y)));
-            const r = Math.max(Math.floor(canvas.width / 80), 3);
+            ensureColorSource();
+            if (!colorSourceCanvas) return { r: 0, g: 0, b: 0 };
+            const ctx = colorSourceCanvas.getContext('2d');
+            const W = colorSourceCanvas.width, H = colorSourceCanvas.height;
+            const px = Math.round(Math.max(0, Math.min(W - 1, x)));
+            const py = Math.round(Math.max(0, Math.min(H - 1, y)));
+            const r = Math.max(Math.floor(W / 80), 3);
             const x0 = Math.max(0, px - r);
             const y0 = Math.max(0, py - r);
-            const w = Math.min(canvas.width - x0, r * 2);
-            const h = Math.min(canvas.height - y0, r * 2);
+            const w = Math.min(W - x0, r * 2);
+            const h = Math.min(H - y0, r * 2);
             const d = ctx.getImageData(x0, y0, w, h).data;
             let tr = 0, tg = 0, tb = 0, c = 0;
             for (let i = 0; i < d.length; i += 4) {
@@ -1053,8 +1312,11 @@
         }
 
         function clearAllPoints() {
-            // 3点を初期位置に戻す
+            // 3点を初期位置に戻し、ズームもリセット
             if (pointsImage) {
+                zoom = 1;
+                viewOffsetX = 0;
+                viewOffsetY = 0;
                 autoPlacePoints();
                 redrawPoints();
                 updatePointsList();
@@ -1062,47 +1324,121 @@
             }
         }
 
-        // キャンバスを再描画（画像＋各ポイントを、その位置の実際の色で表示）
+        // 画像座標→キャンバス表示座標に変換
+        function imageToCanvasCoords(ix, iy) {
+            const canvas = document.getElementById('pointsCanvas');
+            const cx = (ix - viewOffsetX) * zoom;
+            const cy = (iy - viewOffsetY) * zoom;
+            return { cx, cy };
+        }
+
+        // キャンバスを再描画（ズーム表示＋各ポイント）
         function redrawPoints() {
             const canvas = document.getElementById('pointsCanvas');
             const ctx = canvas.getContext('2d');
 
             if (!pointsImage) return;
+            ensureColorSource();
 
-            // 画像を描き直す
+            // 表示する画像範囲（ズームとオフセットで決まる）
+            const viewW = canvas.width / zoom;
+            const viewH = canvas.height / zoom;
+
+            // 画像を切り出してキャンバス全体に描画
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(pointsImage, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(
+                pointsImage,
+                viewOffsetX, viewOffsetY, viewW, viewH,  // 元画像の切り出し範囲
+                0, 0, canvas.width, canvas.height         // 描画先（全体）
+            );
 
-            // マーカーサイズ（画像解像度に応じて大きめに）
+            // マーカーサイズ（表示解像度基準、拡大時も一定の見た目サイズ）
             const markerRadius = Math.max(canvas.width / 22, 22);
             const fontSize = Math.max(canvas.width / 40, 16);
 
             state.leafPoints.forEach((p, i) => {
                 const col = getColorAt(p.x, p.y);
+                const { cx, cy } = imageToCanvasCoords(p.x, p.y);
 
-                // 外側の白リング（視認性確保）
+                // 表示範囲外の点は描かない
+                if (cx < -markerRadius || cx > canvas.width + markerRadius ||
+                    cy < -markerRadius || cy > canvas.height + markerRadius) {
+                    return;
+                }
+
+                // 外側の白リング
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, markerRadius + 3, 0, 2 * Math.PI);
+                ctx.arc(cx, cy, markerRadius + 3, 0, 2 * Math.PI);
                 ctx.fillStyle = 'white';
                 ctx.fill();
 
-                // その位置の実際の色で塗った円（ユーザーが選んだ色を即確認できる）
+                // その位置の実際の色で塗った円
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, markerRadius, 0, 2 * Math.PI);
+                ctx.arc(cx, cy, markerRadius, 0, 2 * Math.PI);
                 ctx.fillStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
                 ctx.fill();
                 ctx.lineWidth = Math.max(canvas.width / 250, 2);
                 ctx.strokeStyle = 'rgba(0,0,0,0.55)';
                 ctx.stroke();
 
-                // 番号（色に応じて黒 or 白の文字で見やすく）
+                // 番号
                 const brightness = 0.299 * col.r + 0.587 * col.g + 0.114 * col.b;
                 ctx.fillStyle = brightness > 140 ? '#000' : '#fff';
                 ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(i + 1, p.x, p.y);
+                ctx.fillText(i + 1, cx, cy);
             });
+        }
+
+        // ズーム操作
+        function applyZoom(newZoom, centerImgX, centerImgY) {
+            const canvas = document.getElementById('pointsCanvas');
+            newZoom = Math.max(1, Math.min(5, newZoom));
+
+            // 指定した画像中心が画面中央に来るようオフセットを計算
+            const viewW = canvas.width / newZoom;
+            const viewH = canvas.height / newZoom;
+            viewOffsetX = centerImgX - viewW / 2;
+            viewOffsetY = centerImgY - viewH / 2;
+
+            // 画像範囲内にクランプ
+            viewOffsetX = Math.max(0, Math.min(pointsImage.width - viewW, viewOffsetX));
+            viewOffsetY = Math.max(0, Math.min(pointsImage.height - viewH, viewOffsetY));
+            if (viewW >= pointsImage.width) viewOffsetX = 0;
+            if (viewH >= pointsImage.height) viewOffsetY = 0;
+
+            zoom = newZoom;
+            redrawPoints();
+        }
+
+        // 現在の表示中心の画像座標を返す
+        function currentCenterImg() {
+            const canvas = document.getElementById('pointsCanvas');
+            return {
+                x: viewOffsetX + (canvas.width / zoom) / 2,
+                y: viewOffsetY + (canvas.height / zoom) / 2
+            };
+        }
+
+        function zoomIn() {
+            if (!pointsImage) return;
+            const c = currentCenterImg();
+            applyZoom(zoom * 1.5, c.x, c.y);
+        }
+
+        function zoomOut() {
+            if (!pointsImage) return;
+            const c = currentCenterImg();
+            applyZoom(zoom / 1.5, c.x, c.y);
+        }
+
+        function zoomReset() {
+            if (!pointsImage) return;
+            zoom = 1;
+            viewOffsetX = 0;
+            viewOffsetY = 0;
+            redrawPoints();
         }
 
         // ========================================
@@ -1176,29 +1512,33 @@
                 const ngrdi = (avgG - avgR) / (avgG + avgR + 1e-6);
                 const nitrogen = 0.15 * ngrdi + 1.2;
 
-                // 診断
-                let diagnosis, recommendation;
-                if (exg < 100) {
-                    diagnosis = '窒素不足';
-                    recommendation = '穂肥の施用を検討してください';
-                } else if (exg < 250) {
-                    diagnosis = 'やや不足';
-                    recommendation = '1週間後に再測定を推奨';
-                } else if (exg < 400) {
-                    diagnosis = '適正';
-                    recommendation = '標準管理で問題ありません';
-                } else {
-                    diagnosis = '過剰';
-                    recommendation = '追肥を控えてください';
-                }
+                // SPAD値の推定（穂肥期の適正SPAD32〜35が中心に来るよう写像）
+                // ExGの実用域を概ね0〜300と見て、SPAD約24〜40へ対応させた暫定式。
+                // ※正式な係数は方法③（自圃場サンプル）で較正して置き換える。
+                let spad = 24 + (exg / 300) * 16;      // ExG 0→24, 150→32, 300→40
+                spad = Math.max(20, Math.min(45, spad)); // 現実的な範囲にクランプ
+
+                // 葉色板（カラースケール）値への換算（千葉県「稲作標準技術体系」の式）
+                // SPAD = カラースケール × 7.8 + 1.6  →  カラースケール = (SPAD − 1.6) / 7.8
+                let colorScale = (spad - 1.6) / 7.8;
+                colorScale = Math.max(1, Math.min(7, colorScale)); // 1〜7に収める
+
+                // 生育段階に応じた評価（測定値は常に出す。評価だけ時期で変える）
+                const evalResult = evaluateByStage(state.growthStage, spad, colorScale);
 
                 // 結果を保存
                 const result = {
                     timestamp: new Date().toLocaleString('ja-JP'),
+                    stage: state.growthStage,
+                    stageLabel: GROWTH_STAGES[state.growthStage].label,
                     exg: exg.toFixed(1),
                     nitrogen: nitrogen.toFixed(2),
-                    diagnosis: diagnosis,
-                    recommendation: recommendation,
+                    spad: spad.toFixed(0),
+                    colorScale: colorScale.toFixed(1),
+                    diagnosis: evalResult.diagnosis,
+                    recommendation: evalResult.recommendation,
+                    fertilizer: evalResult.fertilizer,
+                    hasEval: evalResult.hasEval,
                     rgbCorrected: { r: avgR.toFixed(1), g: avgG.toFixed(1), b: avgB.toFixed(1) },
                     image: state.leafImage
                 };
@@ -1212,15 +1552,99 @@
         }
 
         // ========================================
+        // 生育段階別の評価
+        // 測定値(SPAD/葉色板)は常に表示。評価だけ時期で変える。
+        // ========================================
+        function evaluateByStage(stage, spad, colorScale) {
+            const cs = colorScale;
+
+            // 穂肥診断（中干し終了直前＝幼穂形成〜減数分裂期）
+            // 津地域普及センター基準：葉色板4.5が穂肥要否の境目
+            if (stage === 'midsummer') {
+                if (cs < 3.5) {
+                    return { hasEval: true, diagnosis: '葉色 かなり淡い', 
+                        recommendation: '葉色が穂肥基準を下回っています。窒素がやや不足気味です。穂肥の施用を検討してください。',
+                        fertilizer: 'NK化成7号: 10〜15kg/10a（1回目）が目安' };
+                } else if (cs < 4.0) {
+                    return { hasEval: true, diagnosis: '穂肥適期（淡い）',
+                        recommendation: '葉色3.5〜4.0。穂肥の施用効果が期待できる葉色です。草丈65cm前後が目安。',
+                        fertilizer: 'NK化成7号: 10〜15kg/10a（1回目）／IB045: 20kg/10a' };
+                } else if (cs < 4.5) {
+                    return { hasEval: true, diagnosis: '穂肥可能',
+                        recommendation: '葉色4.0〜4.5。穂肥は控えめに。草丈70cm前後が目安。倒伏に注意。',
+                        fertilizer: 'NK化成7号: 7〜10kg/10a（1回目）／IB045: 10kg/10a' };
+                } else {
+                    return { hasEval: true, diagnosis: '穂肥不要（濃い）',
+                        recommendation: '葉色4.5以上。窒素は十分です。穂肥は施用しないでください（施肥過多は倒伏・食味低下の原因）。',
+                        fertilizer: '穂肥は「やらない」' };
+                }
+            }
+
+            // 出穂期：SPAD33(葉色板4.5)を下回ると追肥検討
+            // 津地域資料：登熟期高温予想時、出穂期にSPAD33下回りで窒素1kg/10a追肥
+            if (stage === 'heading') {
+                if (spad < 33) {
+                    return { hasEval: true, diagnosis: '葉色 淡い（追肥検討）',
+                        recommendation: '出穂期にSPAD33（葉色板4.5）を下回っています。登熟期の高温が予想される場合、白未熟粒対策として追肥が有効です。',
+                        fertilizer: '窒素成分で 1kg/10a 程度の追肥' };
+                } else {
+                    return { hasEval: true, diagnosis: '葉色 十分',
+                        recommendation: '出穂期の葉色は確保されています（SPAD33以上）。通常は追肥不要です。落水を早めず、収穫7日前まで飽水管理を。',
+                        fertilizer: '追肥は不要' };
+                }
+            }
+
+            // 最大分げつ期：標準SPAD31〜35との比較（参考表示のみ、施肥指示はしない）
+            if (stage === 'tillering') {
+                if (spad < 31) {
+                    return { hasEval: true, diagnosis: '標準より淡い',
+                        recommendation: 'この時期の標準（SPAD31〜35）よりやや淡めです。生育の遅れや葉色の推移を観察してください。※この時期は葉色のみで施肥判断はしません。',
+                        fertilizer: '' };
+                } else if (spad <= 35) {
+                    return { hasEval: true, diagnosis: '標準的な葉色',
+                        recommendation: 'この時期の標準（SPAD31〜35）の範囲です。順調な生育の目安です。※この時期は葉色のみで施肥判断はしません。',
+                        fertilizer: '' };
+                } else {
+                    return { hasEval: true, diagnosis: '標準より濃い',
+                        recommendation: 'この時期の標準（SPAD31〜35）より濃いめです。過繁茂・倒伏に注意し、中干しで生育を調整してください。※この時期は葉色のみで施肥判断はしません。',
+                        fertilizer: '' };
+                }
+            }
+
+            // 収穫直前：葉色診断の対象外
+            if (stage === 'preharvest') {
+                return { hasEval: false, diagnosis: '測定値の記録',
+                    recommendation: 'この時期は葉色による施肥診断の対象ではありません。測定値の記録・比較としてご利用ください。',
+                    fertilizer: '' };
+            }
+
+            // 実測のみ（デフォルト）：評価なし、数値だけ
+            return { hasEval: false, diagnosis: '測定値の記録',
+                recommendation: '生育段階を選ぶと、その時期に応じた評価が表示されます。（ホーム画面で選択）',
+                fertilizer: '' };
+        }
+
+        // ========================================
         // 結果表示
         // ========================================
         function showResults(result) {
             document.getElementById('resultImage').src = result.image;
             document.getElementById('exgValue').textContent = result.exg;
             document.getElementById('nitrogenValue').textContent = result.nitrogen + '%';
+            document.getElementById('spadValue').textContent = result.spad;
+            document.getElementById('colorScaleValue').textContent = result.colorScale;
             document.getElementById('diagnosisLevel').textContent = result.diagnosis;
-            document.getElementById('diagnosisText').textContent = `推定窒素: ${result.nitrogen}%`;
+            document.getElementById('diagnosisText').textContent = `【${result.stageLabel}】葉色板 ${result.colorScale} ／ SPAD ${result.spad}（推定）`;
             document.getElementById('recommendationText').textContent = result.recommendation;
+
+            // 穂肥ボックスは施用量がある時だけ表示
+            const fbox = document.getElementById('fertilizerBox');
+            if (result.fertilizer) {
+                fbox.textContent = result.fertilizer;
+                fbox.style.display = 'block';
+            } else {
+                fbox.style.display = 'none';
+            }
 
             const rgb = result.rgbCorrected;
             document.getElementById('rgbDisplay').innerHTML = `
@@ -1251,15 +1675,19 @@
         // ========================================
         function downloadData() {
             const csv = [
-                ['測定時刻', 'ExG値', '推定窒素濃度(%)', '診断', '推奨アクション'],
+                ['測定時刻', '生育段階', '葉色板(推定)', 'SPAD(推定)', '診断', '穂肥/追肥の目安', 'ExG値', '推定窒素(%)', '推奨アクション'],
                 ...state.measurements.map(m => [
                     m.timestamp,
+                    m.stageLabel || '',
+                    m.colorScale,
+                    m.spad,
+                    m.diagnosis,
+                    m.fertilizer || '',
                     m.exg,
                     m.nitrogen,
-                    m.diagnosis,
                     m.recommendation
                 ])
-            ].map(row => row.join(',')).join('\n');
+            ].map(row => row.map(c => `"${c}"`).join(',')).join('\n');
 
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -1278,11 +1706,11 @@
             } else {
                 dataList.innerHTML = state.measurements.map(m => `
                     <div class="data-item">
-                        <div class="data-time">${m.timestamp}</div>
+                        <div class="data-time">${m.timestamp}　<strong>${m.stageLabel || ''}</strong></div>
                         <div class="data-main">
                             <div>
-                                <div class="data-exg">ExG: ${m.exg}</div>
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">窒素: ${m.nitrogen}%</div>
+                                <div class="data-exg">葉色板 ${m.colorScale}　SPAD ${m.spad}</div>
+                                <div style="font-size: 12px; color: #666; margin-top: 4px;">ExG: ${m.exg}</div>
                             </div>
                             <div class="data-diagnosis">${m.diagnosis}</div>
                         </div>
