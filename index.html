@@ -335,44 +335,62 @@
         /* ========================================== */
         .points-screen {
             padding: 16px;
+            overflow: hidden;
+        }
+
+        /* 見出し・説明・写真・ボタンは縮まない固定部。リストだけ伸縮 */
+        .points-screen h2 {
+            flex-shrink: 0;
         }
 
         .points-instruction {
             background: #E3F2FD;
             border-left: 4px solid #2196F3;
-            padding: 12px;
+            padding: 10px;
             border-radius: 4px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             font-size: 13px;
             color: #1565C0;
+            flex-shrink: 0;
         }
 
         .points-canvas-container {
             position: relative;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             border-radius: 8px;
             overflow: hidden;
             border: 2px solid #e0e0e0;
             background: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
         }
 
         #pointsCanvas {
-            width: 100%;
+            max-width: 100%;
+            max-height: 45vh;
+            width: auto;
             height: auto;
             display: block;
             cursor: crosshair;
+            object-fit: contain;
         }
 
+        /* ポイントリストは残りスペースで独立スクロール。写真は隠れない */
         .points-list {
-            margin-bottom: 16px;
+            flex: 1;
+            min-height: 44px;
+            overflow-y: auto;
+            margin-bottom: 12px;
         }
 
         .point-item {
             background: white;
             border: 1px solid #e0e0e0;
             border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -388,9 +406,10 @@
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 11px;
+            padding: 6px 14px;
+            font-size: 12px;
             cursor: pointer;
+            flex-shrink: 0;
         }
 
         /* ========================================== */
@@ -401,6 +420,12 @@
             gap: 12px;
             padding: 16px;
             background: #f5f5f5;
+        }
+
+        .points-screen .btn-group {
+            padding: 0;
+            background: transparent;
+            flex-shrink: 0;
         }
 
         .btn {
@@ -746,10 +771,17 @@
             const canvas = document.getElementById('previewCanvas');
             const ctx = canvas.getContext('2d');
 
+            // 映像がまだ準備できていない場合はガード
+            if (!video.videoWidth || !video.videoHeight) {
+                alert('カメラの準備中です。少し待ってからもう一度お試しください。');
+                return;
+            }
+
+            // video からのキャプチャは向き情報(EXIF)の影響を受けず、
+            // 見えている映像がそのまま撮れる
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-
-            ctx.drawImage(video, 0, 0);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             if (state.mode === 'reflector') {
                 captureReflector(canvas);
@@ -847,9 +879,8 @@
                 pointsImage = img;
                 pointsCanvas.width = img.width;
                 pointsCanvas.height = img.height;
-                // 表示はCSSで幅100%・高さautoにより自動スケール（画像は切れない）
-                pointsCanvas.style.width = '100%';
-                pointsCanvas.style.height = 'auto';
+                // 表示サイズはCSS（max-width:100% / max-height:60vh）に任せる。
+                // ここでインラインstyleを設定すると縦長画像がはみ出すため設定しない。
 
                 // 画像を描画（ポイントはまだ無い）
                 redrawPoints();
