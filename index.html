@@ -165,11 +165,33 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80%;
-            aspect-ratio: 4/3;
-            border: 3px dashed rgba(255,255,255,0.5);
+            width: 50%;
+            height: 40%;
+            border: 3px dashed rgba(255, 235, 59, 0.9);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.15);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .overlay-guide::after {
+            content: "この枠に反射板を合わせる";
+            position: absolute;
+            bottom: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            background: rgba(255, 152, 0, 0.9);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 12px;
             border-radius: 12px;
-            background: rgba(0,0,0,0.3);
+        }
+
+        .overlay-guide.hidden {
+            display: none;
         }
 
         .mode-indicator {
@@ -375,6 +397,7 @@
             display: block;
             cursor: crosshair;
             object-fit: contain;
+            touch-action: none;
         }
 
         /* ポイントリストは残りスペースで独立スクロール。写真は隠れない */
@@ -392,13 +415,21 @@
             padding: 8px 12px;
             margin-bottom: 6px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 10px;
             font-size: 13px;
         }
 
+        .point-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
         .point-label {
-            color: #666;
+            color: #444;
         }
 
         .point-delete {
@@ -591,7 +622,7 @@
                     <canvas id="previewCanvas"></canvas>
                     
                     <div class="camera-overlay">
-                        <div class="overlay-guide"></div>
+                        <div class="overlay-guide" id="overlayGuide"></div>
                         <div class="mode-indicator" id="modeIndicator">反射板</div>
                     </div>
 
@@ -610,7 +641,7 @@
             <div class="screen points-screen" id="pointsScreen">
                 <h2 style="margin-bottom: 16px;">葉のポイントを指定</h2>
                 <div class="points-instruction">
-                    画像上をクリックして、葉の色が濃い部分を3～5か所指定してください。
+                    3つの測定点を自動配置しました。円の色がその場所の葉の色です。指でドラッグして、葉の濃い部分に合わせてください。
                 </div>
 
                 <div class="points-canvas-container">
@@ -620,9 +651,9 @@
                 <div class="points-list" id="pointsList"></div>
 
                 <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="clearAllPoints()">全削除</button>
-                    <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeLeaf()" disabled>
-                        解析開始（3個以上）
+                    <button class="btn btn-secondary" onclick="clearAllPoints()">位置をリセット</button>
+                    <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeLeaf()">
+                        解析開始
                     </button>
                 </div>
             </div>
@@ -714,6 +745,7 @@
             showScreen('cameraScreen');
             document.getElementById('modeIndicator').className = 'mode-indicator reflector';
             document.getElementById('modeIndicator').textContent = '反射板を撮影';
+            document.getElementById('overlayGuide').classList.remove('hidden');
             startCamera();
         }
 
@@ -802,45 +834,57 @@
 
         function detectReflector(canvas) {
             const ctx = canvas.getContext('2d');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // 画面のガイド枠（中央の点線長方形）に対応する中央領域だけを測定する。
+            // 枠は画面幅80%・アスペクト比4:3で中央配置しているので、
+            // 画像の中央60%四方あたりを測定範囲とする（枠の内側を確実に含む）。
+            const regionW = Math.floor(canvas.width * 0.5);
+            const regionH = Math.floor(canvas.height * 0.4);
+            const startX = Math.floor((canvas.width - regionW) / 2);
+            const startY = Math.floor((canvas.height - regionH) / 2);
+
+            const imageData = ctx.getImageData(startX, startY, regionW, regionH);
             const data = imageData.data;
 
-            // 明るい領域（反射板）を検出
-            let brightCount = 0;
-            let totalR = 0, totalG = 0, totalB = 0;
-
+            // 測定領域内の全ピクセルの平均を反射板の色とする
+            let totalR = 0, totalG = 0, totalB = 0, count = 0;
             for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                // グレースケール値が高い（V値が大きい）ものをカウント
-                const grey = 0.299 * r + 0.587 * g + 0.114 * b;
-                if (grey > 180 && Math.abs(r - g) < 50 && Math.abs(g - b) < 50) {
-                    totalR += r;
-                    totalG += g;
-                    totalB += b;
-                    brightCount++;
-                }
+                totalR += data[i];
+                totalG += data[i + 1];
+                totalB += data[i + 2];
+                count++;
             }
 
-            if (brightCount > 0) {
+            if (count > 0) {
+                const avgR = totalR / count;
+                const avgG = totalG / count;
+                const avgB = totalB / count;
+                const grey = 0.299 * avgR + 0.587 * avgG + 0.114 * avgB;
+
                 state.reflectorRGB = {
-                    r: totalR / brightCount,
-                    g: totalG / brightCount,
-                    b: totalB / brightCount
+                    r: avgR,
+                    g: avgG,
+                    b: avgB
                 };
 
-                console.log('反射板検出:', state.reflectorRGB);
-                alert(`✅ 反射板を検出しました\nRGB: (${Math.round(state.reflectorRGB.r)}, ${Math.round(state.reflectorRGB.g)}, ${Math.round(state.reflectorRGB.b)})\n\n続いて葉を撮影してください。`);
+                console.log('反射板測定（中央領域平均）:', state.reflectorRGB, 'grey=', grey);
+
+                // 明るさが極端に低い場合は警告（暗すぎて基準にならない）
+                let warn = '';
+                if (grey < 80) {
+                    warn = '\n\n⚠️ やや暗めです。明るい場所で反射板を枠いっぱいに写すと精度が上がります。';
+                }
+
+                alert(`✅ 反射板の色を取得しました\nRGB: (${Math.round(avgR)}, ${Math.round(avgG)}, ${Math.round(avgB)})\n明るさ: ${Math.round(grey)}${warn}\n\n続いて葉を撮影してください。`);
 
                 // 葉撮影モードに切り替え、カメラを再起動して映像を動かす
                 state.mode = 'leaf';
                 document.getElementById('modeIndicator').className = 'mode-indicator leaf';
                 document.getElementById('modeIndicator').textContent = '葉を撮影';
+                document.getElementById('overlayGuide').classList.add('hidden');
                 startCamera();
             } else {
-                alert('❌ 反射板が検出できません。反射板を正面に向けて撮影してください。');
+                alert('❌ 測定に失敗しました。もう一度撮影してください。');
             }
         }
 
@@ -866,7 +910,8 @@
 
         // ポイント指定で使う画像を一度だけ保持する
         let pointsImage = null;
-        let pointsClickHandlerAttached = false;
+        let pointsHandlersAttached = false;
+        let draggingIndex = -1;   // ドラッグ中のポイント番号（-1なら無し）
 
         function showPointsScreen() {
             showScreen('pointsScreen');
@@ -879,94 +924,180 @@
                 pointsImage = img;
                 pointsCanvas.width = img.width;
                 pointsCanvas.height = img.height;
-                // 表示サイズはCSS（max-width:100% / max-height:60vh）に任せる。
-                // ここでインラインstyleを設定すると縦長画像がはみ出すため設定しない。
 
-                // 画像を描画（ポイントはまだ無い）
+                // 3点を自動配置（画像中央付近に三角形状に散らす）
+                autoPlacePoints();
+
+                // 描画
                 redrawPoints();
 
-                // クリックリスナーは一度だけ登録（重複登録による多重増加を防止）
-                if (!pointsClickHandlerAttached) {
-                    pointsCanvas.addEventListener('click', onCanvasClick);
-                    pointsClickHandlerAttached = true;
+                // 3点あるので解析ボタンを有効化
+                document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
+
+                // ドラッグ用のイベントは一度だけ登録
+                if (!pointsHandlersAttached) {
+                    // マウス
+                    pointsCanvas.addEventListener('mousedown', onPointerDown);
+                    pointsCanvas.addEventListener('mousemove', onPointerMove);
+                    window.addEventListener('mouseup', onPointerUp);
+                    // タッチ（スマホ）
+                    pointsCanvas.addEventListener('touchstart', onPointerDown, { passive: false });
+                    pointsCanvas.addEventListener('touchmove', onPointerMove, { passive: false });
+                    window.addEventListener('touchend', onPointerUp);
+                    pointsHandlersAttached = true;
                 }
             };
             img.src = state.leafImage;
         }
 
-        // キャンバスクリック時のハンドラ（表示座標→画像座標へ変換）
-        function onCanvasClick(e) {
+        // 3点を画像中央付近に自動配置
+        function autoPlacePoints() {
+            const w = pointsImage.width;
+            const h = pointsImage.height;
+            state.leafPoints = [
+                { x: w * 0.40, y: h * 0.38 },
+                { x: w * 0.60, y: h * 0.42 },
+                { x: w * 0.50, y: h * 0.60 }
+            ];
+        }
+
+        // イベント座標→画像解像度の座標に変換
+        function eventToImageCoords(e) {
             const canvas = document.getElementById('pointsCanvas');
             const rect = canvas.getBoundingClientRect();
-            // 表示上のクリック位置を、キャンバスの実解像度の座標に変換
+            const point = e.touches ? e.touches[0] : e;
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+            const x = (point.clientX - rect.left) * scaleX;
+            const y = (point.clientY - rect.top) * scaleY;
+            return { x, y };
+        }
 
-            if (state.leafPoints.length >= 5) {
-                alert('ポイントは最大5個までです');
-                return;
+        // 指定座標に最も近いポイントの番号を返す（近ければ）
+        function findNearestPoint(x, y) {
+            const canvas = document.getElementById('pointsCanvas');
+            const hitRadius = Math.max(canvas.width / 12, 40); // 指で掴みやすい範囲
+            let nearest = -1;
+            let minDist = hitRadius;
+            state.leafPoints.forEach((p, i) => {
+                const d = Math.hypot(p.x - x, p.y - y);
+                if (d < minDist) {
+                    minDist = d;
+                    nearest = i;
+                }
+            });
+            return nearest;
+        }
+
+        function onPointerDown(e) {
+            e.preventDefault();
+            const { x, y } = eventToImageCoords(e);
+            draggingIndex = findNearestPoint(x, y);
+            // 近くに点が無ければ何もしない（誤操作で点が増えないように）
+            if (draggingIndex >= 0) {
+                // つかんだ点をその位置に少し寄せる
+                state.leafPoints[draggingIndex] = { x, y };
+                redrawPoints();
+                updatePointsList();
             }
+        }
 
-            state.leafPoints.push({ x, y });
-            updatePointsList();
+        function onPointerMove(e) {
+            if (draggingIndex < 0) return;
+            e.preventDefault();
+            const { x, y } = eventToImageCoords(e);
+            // 画像範囲内にクランプ
+            const cx = Math.max(0, Math.min(pointsImage.width - 1, x));
+            const cy = Math.max(0, Math.min(pointsImage.height - 1, y));
+            state.leafPoints[draggingIndex] = { x: cx, y: cy };
             redrawPoints();
+            updatePointsList();
+        }
 
-            document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
+        function onPointerUp() {
+            draggingIndex = -1;
+        }
+
+        // 指定座標の色を取得（周辺の平均、露出補正なしの生の色）
+        function getColorAt(x, y) {
+            const canvas = document.getElementById('pointsCanvas');
+            const ctx = canvas.getContext('2d');
+            const px = Math.round(Math.max(0, Math.min(canvas.width - 1, x)));
+            const py = Math.round(Math.max(0, Math.min(canvas.height - 1, y)));
+            const r = Math.max(Math.floor(canvas.width / 80), 3);
+            const x0 = Math.max(0, px - r);
+            const y0 = Math.max(0, py - r);
+            const w = Math.min(canvas.width - x0, r * 2);
+            const h = Math.min(canvas.height - y0, r * 2);
+            const d = ctx.getImageData(x0, y0, w, h).data;
+            let tr = 0, tg = 0, tb = 0, c = 0;
+            for (let i = 0; i < d.length; i += 4) {
+                tr += d[i]; tg += d[i + 1]; tb += d[i + 2]; c++;
+            }
+            return c > 0
+                ? { r: Math.round(tr / c), g: Math.round(tg / c), b: Math.round(tb / c) }
+                : { r: 0, g: 0, b: 0 };
         }
 
         function updatePointsList() {
             const list = document.getElementById('pointsList');
-            list.innerHTML = state.leafPoints.map((p, i) => `
+            list.innerHTML = state.leafPoints.map((p, i) => {
+                const col = getColorAt(p.x, p.y);
+                const rgbStr = `rgb(${col.r}, ${col.g}, ${col.b})`;
+                return `
                 <div class="point-item">
-                    <span class="point-label">ポイント ${i + 1}: (${Math.round(p.x)}, ${Math.round(p.y)})</span>
-                    <button class="point-delete" onclick="deletePoint(${i})">削除</button>
-                </div>
-            `).join('');
-        }
-
-        function deletePoint(index) {
-            state.leafPoints.splice(index, 1);
-            updatePointsList();
-            redrawPoints();
-            document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
+                    <span class="point-swatch" style="background:${rgbStr}"></span>
+                    <span class="point-label">ポイント ${i + 1}　RGB(${col.r}, ${col.g}, ${col.b})</span>
+                </div>`;
+            }).join('');
         }
 
         function clearAllPoints() {
-            state.leafPoints = [];
-            updatePointsList();
-            redrawPoints();
-            document.getElementById('analyzeBtn').disabled = true;
+            // 3点を初期位置に戻す
+            if (pointsImage) {
+                autoPlacePoints();
+                redrawPoints();
+                updatePointsList();
+                document.getElementById('analyzeBtn').disabled = (state.leafPoints.length < 3);
+            }
         }
 
-        // キャンバスを再描画（画像＋現在のポイントすべて）— 同期処理で確実
+        // キャンバスを再描画（画像＋各ポイントを、その位置の実際の色で表示）
         function redrawPoints() {
             const canvas = document.getElementById('pointsCanvas');
             const ctx = canvas.getContext('2d');
 
             if (!pointsImage) return;
 
-            // 毎回まっさらに描き直す（古いポイントの残留を完全に防止）
+            // 画像を描き直す
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(pointsImage, 0, 0, canvas.width, canvas.height);
 
-            // マーカーのサイズを画像解像度に合わせて調整（大きい写真でも見やすく）
-            const markerRadius = Math.max(canvas.width / 45, 10);
-            const fontSize = Math.max(canvas.width / 55, 12);
+            // マーカーサイズ（画像解像度に応じて大きめに）
+            const markerRadius = Math.max(canvas.width / 22, 22);
+            const fontSize = Math.max(canvas.width / 40, 16);
 
             state.leafPoints.forEach((p, i) => {
-                // ポイント円
-                ctx.fillStyle = '#4CAF50';
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = Math.max(canvas.width / 300, 2);
+                const col = getColorAt(p.x, p.y);
+
+                // 外側の白リング（視認性確保）
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, markerRadius + 3, 0, 2 * Math.PI);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+
+                // その位置の実際の色で塗った円（ユーザーが選んだ色を即確認できる）
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, markerRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgb(${col.r}, ${col.g}, ${col.b})`;
                 ctx.fill();
+                ctx.lineWidth = Math.max(canvas.width / 250, 2);
+                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
                 ctx.stroke();
 
-                // ポイント番号
-                ctx.fillStyle = 'white';
+                // 番号（色に応じて黒 or 白の文字で見やすく）
+                const brightness = 0.299 * col.r + 0.587 * col.g + 0.114 * col.b;
+                ctx.fillStyle = brightness > 140 ? '#000' : '#fff';
                 ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -1110,6 +1241,7 @@
             showScreen('cameraScreen');
             document.getElementById('modeIndicator').className = 'mode-indicator leaf';
             document.getElementById('modeIndicator').textContent = '葉を撮影';
+            document.getElementById('overlayGuide').classList.add('hidden');
             // カメラを再起動して映像を動かす（黒画面防止）
             startCamera();
         }
