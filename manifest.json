@@ -1,0 +1,62 @@
+{
+  "name": "稲葉クロロフィル診断 - 現場検査アプリ",
+  "short_name": "クロロフィル診断",
+  "description": "スマートフォンカメラで稲葉の窒素濃度をリアルタイム診断します",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2E7D32",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232E7D32' width='192' height='192'/><text x='96' y='110' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>🌾</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%232E7D32' width='512' height='512'/><text x='256' y='280' font-size='220' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>🌾</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23f5f5f5' width='540' height='720'/><rect fill='%232E7D32' width='540' height='100'/><text x='270' y='50' font-size='24' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>🌾 診断アプリ</text><rect x='20' y='150' width='500' height='400' rx='10' fill='white' stroke='%23ddd' stroke-width='2'/><text x='270' y='300' font-size='18' font-weight='bold' fill='%23333' text-anchor='middle'>反射板を撮影</text><text x='270' y='400' font-size='16' fill='%23666' text-anchor='middle'>葉をアップで撮影</text><text x='270' y='450' font-size='16' fill='%23666' text-anchor='middle'>即座に結果表示</text></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    }
+  ],
+  "categories": ["agriculture", "productivity"],
+  "shortcuts": [
+    {
+      "name": "反射板撮影",
+      "short_name": "反射板",
+      "description": "反射板を撮影して環境を掌握",
+      "url": "./index.html?mode=reflector",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%23FF9800' width='96' height='96'/><text x='48' y='56' font-size='40' text-anchor='middle' dominant-baseline='central'>📷</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "葉撮影",
+      "short_name": "葉撮影",
+      "description": "葉をアップで撮影して診断",
+      "url": "./index.html?mode=leaf",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%234CAF50' width='96' height='96'/><text x='48' y='56' font-size='40' text-anchor='middle' dominant-baseline='central'>🍃</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
